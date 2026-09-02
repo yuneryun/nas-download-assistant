@@ -57,7 +57,25 @@ http://tracker.bt4g.com:2095/announce
 - 老片做种少，新片（半年内）通常快得多
 - 一律 `--seed-time=0`（下完不做种，NAS 硬盘省寿命；如需保种改回 0）
 
-## 版本命名速查
+## 下载引擎（双引擎支持）
+
+### aria2（默认，skill 内置对接）
+- 优势：零依赖单二进制（NAS 固件几乎都自带）、RPC 适合脚本驱动、HTTP/BT 混合
+- 脚本 `movie_pipeline.py` 默认走 aria2 RPC
+
+### qBittorrent-nox（可选，WebUI 更友好）
+- 优势：DHT/PEX/LSD peer 发现更强、手机浏览器看进度、有完整 WebUI
+- 安装（Debian 系）：`sudo apt install qbittorrent-nox` → `qbittorrent-nox` 后台跑（默认 WebUI :8080，首次登录 admin/随机密码看启动日志）
+- 与 skill 对接：WebUI 有自己的 API（`/api/v2/`），把 `config.json` 的 `engine` 字段改成 `qbittorrent` 并填 `qb_url/qb_user/qb_pass` 即可；或直接在 WebUI 里手动丢磁力链，下载完仍用 `movie_pipeline.py verify` 走统一校验归档
+- 无 sudo 的 NAS：用静态二进制放 `~/bin` 也能跑
+
+### 引擎选择建议
+| 场景 | 引擎 |
+|---|---|
+| AI agent 自动化驱动 | aria2（RPC 简单直接） |
+| 手机看进度/手动管理 | qBittorrent（WebUI 体验好） |
+| 冷门资源抢连接 | qBittorrent（PEX/LSD 更强） |
+| 两者混用 | 完全可以——校验归档层与引擎无关 |
 
 | 标记 | 含义 |
 |---|---|
