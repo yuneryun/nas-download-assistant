@@ -32,4 +32,26 @@ references/musicdl-core.md   # 音乐下载坑库
 ```
 
 ## 来源
-作者在 Hermes Agent + 飞牛OS NAS 上实战迭代，已验证：盗梦空间 4K REMUX (79.6GB) 完整下载+校验流程。
+作者在 Hermes Agent + 飞牛OS NAS 上实战迭代。
+
+## ✅ 实战验证记录
+
+### 案例：盗梦空间 Inception (2010) 4K REMUX — 2026-09-02
+
+| 项 | 数值 |
+|---|---|
+| 版本 | Inception.2010.2160p.BluRay.REMUX.HEVC.DTS-HD.MA.5.1-FGT |
+| 体积 | 79.57 GiB（85,436,578,297 字节，与源逐字节一致） |
+| 下载耗时 | 70 分钟（速度 3→23 MB/s 爬升，BT 马太效应） |
+| 元数据 | 3840×2160 HEVC 10bit，时长 148.1 min（8888s，与实际片长一致） |
+| 音轨 | DTS-HD MA 主音轨 + 多条 AC3 评论音轨，完整保留 |
+| 解码实测 | 开头/中段/结尾抽样解码零错误，中段实测播放推进正常 |
+| BT 哈希 | aria2 自动校验通过（Download complete） |
+| 结论 | ✅ 四道校验全过，可正常观看 |
+
+> 中段 ffmpeg null-muxer 输出的 "non monotonically increasing dts" 为 null 封装的正常提示，非文件损坏；以实际解码推进（time 正常走秒）为准。
+
+### 经验
+- BT 速度呈马太效应：起手 3MB/s → 40+ 连接后 20MB/s+，评估 ETA 要留余量
+- REMUX 无封装中文字幕（原盘特性），需外挂 SRT
+
