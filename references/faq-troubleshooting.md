@@ -90,6 +90,12 @@ pip install mutagen musicdl   # 音乐管线需要
 ```
 读回验证：`trimacl <目录>` 应显示 permset 完整串。
 
+**权限分级（最小权限原则，按需选）**：
+| 权限串 | 适用场景 |
+|---|---|
+| `rwx:sfd` | 纯下载（建文件+写入+读回）。音乐目录只下载不归档时这就够 |
+| `rwxpdDaAeEcCo` | 完整管线需要 rename/删临时文件/写属性（本 skill 的归档含 shutil.move=复制+删除，必须 d/D） |
+
 **经验**：NAS 固件的自有权限层（群晖/威联通/unRAID 同理）都可能有类似"第二层"，POSIX ACL 调通了还不行，就查固件专有 ACL。
 看具体关卡：
 - 元数据关：假 4K（WEB-DL 冒充），换真 REMUX 源
