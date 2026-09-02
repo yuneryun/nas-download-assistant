@@ -102,4 +102,5 @@ REMUX 预期：3840×2160 / 视频码率 40-80Mbps / HEVC / HDR10 或 DV 元数�
 - `scripts/movie_pipeline.py` — 搜索→选版→下载→校验→归档 一体化脚本
 - `scripts/selftest.py` — 部署自检
 - `references/musicdl-core.md` — 音乐下载完整坑库
+- `references/music-optimization.md` — 音乐进阶优化（Hi-Res验证/并发提速/元数据补全/查重）
 - `references/optimization-playbook.md` — 找不到资源/下载慢的优化手册（进阶）
