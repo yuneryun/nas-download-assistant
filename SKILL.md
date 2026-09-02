@@ -106,3 +106,4 @@ REMUX 预期：3840×2160 / 视频码率 40-80Mbps / HEVC / HDR10 或 DV 元数�
 - `references/musicdl-core.md` — 音乐下载完整坑库
 - `references/music-optimization.md` — 音乐进阶优化（Hi-Res验证/并发提速/元数据补全/查重）
 - `references/optimization-playbook.md` — 找不到资源/下载慢的优化手册（进阶）
+- `references/faq-troubleshooting.md` — 他人部署常见问题排查手册（拉取失败/依赖/配置/安全）
