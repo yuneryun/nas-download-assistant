@@ -112,3 +112,4 @@ Hermes 账户家目录 `/home/Hermes` 不存在 → 一切写 HOME 的工具（r
 - `references/music-optimization.md` — 音乐进阶优化（Hi-Res验证/并发提速/元数据补全/查重）
 - `references/optimization-playbook.md` — 找不到资源/下载慢的优化手册（进阶）
 - `references/faq-troubleshooting.md` — 他人部署常见问题排查手册（拉取失败/依赖/配置/安全）
+- `references/ai-handoff.md` — AI-to-AI 交接指南（发给别的 NAS 上的 agent 时让对方先读这份）
