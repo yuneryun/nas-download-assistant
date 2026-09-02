@@ -72,7 +72,25 @@ pip install mutagen musicdl   # 音乐管线需要
 ### 4.2 BT 端口不通（速度常年 <1MB/s 且 CN 很低）
 路由器放行 26999(TCP/UDP) + 26998(UDP)，有 IPv6 的开 IPv6 入站。这是速度优化最大单项。
 
-### 4.3 下载完成但校验失败
+### 4.3 飞牛 OS 双层 ACL 完整案例（TrimACL，最阴险的坑）
+
+**症状**：`setfacl` 给用户加了 rwx（getfacl 可查、mask::rwx、路径穿越 x 也都通），但实际写/删仍 `Permission denied`——POSIX 层说可以，内核说不行。
+
+**误诊路线**（作者亲历）：先怀疑目录权限位 → 补中间层穿越 x → 还是不行。
+**真根因**：飞牛 OS 是**双层 ACL**：
+- 外层 POSIX ACL：`setfacl` 管理，任何用户可改
+- 内层 **TrimACL**（`/usr/trim/bin/trimacl`）：飞牛自有库，**只有 root 的 trimacl 或网页端**能读写，setfacl 对它无效
+
+**第二重坑**：TrimACL 是 NTFS 风格权限串 `rwxpdDaAeEcCo`，授 `rwx` **不含 d（删自身）/D（删子项）/A（写属性）**——表现为：能建文件、能写入，但 `os.remove`/`rename` 报 EACCES，自检"可写但删不掉"。
+
+**修法**（root 执行，或飞牛网页端-文件管理-权限）：
+```bash
+/usr/trim/bin/trimacl -m a:u:<UID>:rwxpdDaAeEcCo:sfd <目录>
+# sfd = 继承 self,file,dir; 1001/992 换成实际 uid
+```
+读回验证：`trimacl <目录>` 应显示 permset 完整串。
+
+**经验**：NAS 固件的自有权限层（群晖/威联通/unRAID 同理）都可能有类似"第二层"，POSIX ACL 调通了还不行，就查固件专有 ACL。
 看具体关卡：
 - 元数据关：假 4K（WEB-DL 冒充），换真 REMUX 源
 - 解码关：文件真损坏，重下
