@@ -86,7 +86,18 @@ REMUX 预期：3840×2160 / 视频码率 40-80Mbps / HEVC / HDR10 或 DV 元数�
 
 ## 部署到新机器（交接给别人）
 
-1. 把本 skill 目录整个拷过去（含 `scripts/`）
+**第 0 步：先把仓库拿到手（国内/老 NAS 高频故障）**
+
+| 场景 | 命令 |
+|------|------|
+| 代理机直接 clone | `git clone https://github.com/yuneryun/nas-download-assistant.git` |
+| 国内/老 NAS 拉不动 | `git clone https://ghproxy.net/https://github.com/yuneryun/nas-download-assistant.git` |
+| git 太老/SSL 报错（飞牛/群晖常见） | 电脑上 clone 后打包：`git archive --format=tar.gz -o mda.tar.gz main` → scp/SMB 传 NAS 解压 |
+| 或者直接下 ZIP | 浏览器开仓库页 → Code → Download ZIP |
+
+实测案例：作者自己的飞牛 OS NAS 的 git 也连不上 GitHub（SSL/网络出口问题），就是用 tarball 传过去的。**clone 不下来≠仓库坏了，换路子即可**。
+
+1. 把仓库拿到本地（见上）
 2. Linux NAS：装 `aria2 ffmpeg python3-pip` → `pip install musicdl mutagen` → 改 `config.json` → 起 aria2c（crontab `@reboot` 自启）
 3. Windows：装 ffmpeg + qBittorrent 或 aria2，其余同
 4. 跑 `scripts/selftest.py` 自检（连 RPC、试下小文件、ffprobe 版本）
