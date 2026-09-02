@@ -84,27 +84,21 @@ REMUX 预期：3840×2160 / 视频码率 40-80Mbps / HEVC / HDR10 或 DV 元数�
 - **音质保底规则（用户定死）：保证能下到**。无损没有就逐级降：FLAC > 320k MP3 > 192k > 任意可听版本；绝不因无无损而放弃，降级后在交付清单里标注实际音质
 - 下载后用 mutagen 确认真无损（16bit/44.1kHz 以上）
 
-## 部署到新机器（交接给别人）
+## 部署边界（设计原则：核心层 vs 环境层）
 
-**第 0 步：先把仓库拿到手（国内/老 NAS 高频故障）**
+本 skill **只管核心层**，环境层由用户自行解决：
 
-| 场景 | 命令 |
-|------|------|
-| 代理机直接 clone | `git clone https://github.com/yuneryun/nas-download-assistant.git` |
-| 国内/老 NAS 拉不动 | `git clone https://ghproxy.net/https://github.com/yuneryun/nas-download-assistant.git` |
-| git 太老/SSL 报错（飞牛/群晖常见） | 电脑上 clone 后打包：`git archive --format=tar.gz -o mda.tar.gz main` → scp/SMB 传 NAS 解压 |
-| 或者直接下 ZIP | 浏览器开仓库页 → Code → Download ZIP |
+| 层 | 内容 | 归属 |
+|---|---|---|
+| ✅ 核心层（skill 负责） | 搜索选版/下载触发/四道校验/选版规则/归档命名逻辑 | 本 skill 的文档+脚本 |
+| ❌ 环境层（用户自备） | 下载引擎安装与启动、目录创建、权限设置、进程自启、通知通道 | 各 NAS 固件自己的文档 |
 
-实测案例：作者自己的飞牛 OS NAS 的 git 也连不上 GitHub（SSL/网络出口问题），就是用 tarball 传过去的。**clone 不下来≠仓库坏了，换路子即可**。
+**原因**：NAS 固件的权限层（飞牛 TrimACL/群晖 synoacltool/威联通 QACL）差异大且只认 root，适配它们会让 skill 膨胀成固件手册且永远测不全。目录/引擎/权限是每台机器一次性工作，用户自己做反而快。
 
-1. 把仓库拿到本地（见上）
-2. Linux NAS：装 `aria2 ffmpeg python3-pip` → `pip install musicdl mutagen` → 改 `config.json` → 起 aria2c（crontab `@reboot` 自启）
-3. Windows：装 ffmpeg + qBittorrent 或 aria2，其余同
-4. 跑 `scripts/selftest.py` 自检（连 RPC、试下小文件、ffprobe 版本）
+skill 内置的 `selftest.py` 会在环境没准备好时明确报缺什么（RPC 不通/ffprobe 缺失/目录不可写），照着修即可。权限相关的实战坑（飞牛双层 ACL 等）保留在 FAQ 里作参考。
 
-## 已知环境坑（飞牛OS实测）
-
-- Hermes 账户家目录 `/home/Hermes` 不存在 → 一切写 HOME 的工具（rclone/musicdl/aria2 vfs cache）先 `export HOME=<可写目录>`
+## 已知环境坑（飞牛OS实测，供参照）
+Hermes 账户家目录 `/home/Hermes` 不存在 → 一切写 HOME 的工具（rclone/musicdl/aria2 vfs cache）先 `export HOME=<可写目录>`
 - 无 sudo / docker daemon 停用 → 全部用户态方案（aria2c 二进制 + setsid + crontab）
 - `nohup` 经 SSH exec 会随通道死 → 必须 `setsid ... </dev/null &`
 - SSH 公钥认证失败（sshd StrictModes）→ paramiko 密码登录
