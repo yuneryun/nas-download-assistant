@@ -100,6 +100,7 @@ REMUX 预期：3840×2160 / 视频码率 40-80Mbps / HEVC / HDR10 或 DV 元数�
 ## 参考文件
 - `scripts/nas-media-download.md` — NAS 下载栈完整部署记录（tracker 池、RPC 用法、飞牛坑）
 - `scripts/movie_pipeline.py` — 搜索→选版→下载→校验→归档 一体化脚本
+- `scripts/verify_media.py` — 音乐完整性校验器（五道关卡，输出 verify_report.json）
 - `scripts/selftest.py` — 部署自检
 - `references/musicdl-core.md` — 音乐下载完整坑库
 - `references/music-optimization.md` — 音乐进阶优化（Hi-Res验证/并发提速/元数据补全/查重）

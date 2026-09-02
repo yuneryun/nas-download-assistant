@@ -1,0 +1,9 @@
+{
+  "download_dir_movies": "/vol2/1000/影视/电影",
+  "download_dir_music": "/vol2/1000/音乐",
+  "aria2_rpc": "http://127.0.0.1:16800",
+  "aria2_secret": "CHANGE_ME",
+  "min_free_gb": 500,
+  "library_index": "media_library.json",
+  "notify_cmd": ""
+}
