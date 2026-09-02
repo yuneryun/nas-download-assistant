@@ -77,6 +77,37 @@ http://tracker.bt4g.com:2095/announce
 | 冷门资源抢连接 | qBittorrent（PEX/LSD 更强） |
 | 两者混用 | 完全可以——校验归档层与引擎无关 |
 
+## 资源搜索：代理出口 + knaben（实测可用）
+
+**重要**：BT 搜索站（bt4g/btdig/solidtorrents/magnetdl 等）几乎全被 Cloudflare bot 防护或 GFW 拦截，无代理的 NAS 直连成功率≈0。解法 = NAS 上跑代理出口。
+
+### 代理出口（NAS 已部署 mihomo）
+```
+二进制: /vol1/1000/mihomo/mihomo (v3 alpha, 支持 anytls 协议)
+配置: /vol1/1000/mihomo/config.yaml (用户自己的机场订阅+dns段)
+代理: http://127.0.0.1:7890 (mixed)
+API: http://127.0.0.1:9090
+自启: crontab @reboot
+```
+**踩坑记录**（作者亲历全过程，别人部署大概率也会遇到）：
+1. 机场节点 server 域名（byteprivatelink.com 等）公网 DNS NXDOMAIN → 不要试图本地解析，直接交给 mihomo 处理
+2. mihomo v1.19.2 不支持 anytls 协议 → 必须用最新版（GitHub Prerelease-Alpha）
+3. 订阅里的 dns 段默认 `enable: false` → 必须 `enable: true`，nameserver 用 DoH（doh.pub）
+4. **订阅来源必须与用户实际使用的 Clash 配置同源**——不同订阅的节点可用性差异巨大（作者用错旧订阅排查了 1 小时）
+
+### 搜索（实测唯一稳定可用：knaben.org）
+```bash
+curl -s -m 20 -x http://127.0.0.1:7890 -L "https://knaben.org/search/<关键词>" \
+  -A "Mozilla/5.0" -o results.html
+grep -c 'magnet:?xt' results.html   # 单次搜索≈100条磁力链
+```
+其他站 403（CF bot 防护）；btdig 可达但限速极严（429）；不要浪费时间。
+
+### 无代理环境的降级
+- 用户提供磁力链/种子 → 跳过搜索直接下载
+- 网盘离线（115/夸克）→ 走网盘 API
+- DHT 直取：已知 info_hash 时 aria2 纯 DHT 即可，无需搜索站
+
 | 标记 | 含义 |
 |---|---|
 | REMUX | 原盘无损提取（最优先，≈FLAC） |
