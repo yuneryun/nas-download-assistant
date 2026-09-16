@@ -17,10 +17,12 @@ python3 scripts/selftest.py
 
 ### 2. 填配置
 编辑 `scripts/config.json`：
-- `download_dir_movies` / `download_dir_music` → 你 NAS 上的实际路径（问用户）
+- `download_dir_movies` / `download_dir_tv` / `download_dir_music` → 你 NAS 上的实际路径（问用户）
 - `aria2_rpc` / `aria2_secret` → 本机 aria2 的 RPC（自己起的就用自己设的 secret）
 - `min_free_gb` → 按用户磁盘调
 - `notify_cmd` → 问用户要不要通知，要的话写推送命令
+- `watchdog.restart_cmd` → 填成你环境的 aria2 拉起命令（setsid 后台，见 nas-media-download.md），这是看门狗自愈的前提
+- `watchdog.follow_urls` / `auto_add` → 用户要追更的剧+发布页；不确定就先留空
 
 ### 3. 验收
 - 再跑一次 `selftest.py` 全绿
@@ -33,7 +35,9 @@ python3 scripts/selftest.py
 2. **下载**：磁力链丢 aria2 RPC，冷启动 0 peer 先等 2 分钟再补 tracker（池在 nas-media-download.md）
 3. **校验是硬门禁**：下载完成≠任务完成。ffprobe 元数据（分辨率/码率/时长对得上真实片长）+ 开中尾三段解码实测，全过才算完
 4. **归档**：改名 `中文名 (年份) 英文名.mkv` + 入库清单查重
-5. **音乐**：musicdl + mutagen 校验，「下A得B」必防（下载后读元数据核对），音质保底策略——无损没有就降级 320k→任意有损，保证能下到
+5. **电视剧**：`tv_pipeline.py` —— 整季包 vs 分集用 `pick` 出建议；`add --ep 1-12` 按集选文件省盘；逐集校验带**时长离群检测**（和本季中位数比，抓错下合集/预告片）；残件移 `_quarantine` 隔离**不删除**；`scan --expect N` 查缺集；`follow <URL> --auto` 追更
+6. **看门狗**：`watchdog.py run` 挂 crontab（`watchdog.py install` 出行）。六件事：RPC 掉线自愈（需配 `watchdog.restart_cmd`）、卡死补 tracker→重连、完成自动进校验队列、磁盘低水位暂停全部任务、追更扫描、机场配额告警。告警 4h 去重防刷屏，状态存 `.watchdog_state.json`，全动作进 `watchdog.log`，**无任何删文件路径**
+7. **音乐**：musicdl + mutagen 校验，「下A得B」必防（下载后读元数据核对），音质保底策略——无损没有就降级 320k→任意有损，保证能下到
 
 ## 常见坑（你都可能踩）
 

@@ -1,9 +1,22 @@
 {
   "download_dir_movies": "/vol2/1000/影视/电影",
+  "download_dir_tv": "/vol2/1000/影视/剧集",
   "download_dir_music": "/vol2/1000/音乐",
   "aria2_rpc": "http://127.0.0.1:16800",
   "aria2_secret": "CHANGE_ME",
   "min_free_gb": 500,
   "library_index": "media_library.json",
-  "notify_cmd": ""
+  "notify_cmd": "",
+  "watchdog": {
+    "restart_cmd": "setsid aria2c --seed-time=0 --enable-rpc --rpc-listen-port=16800 --rpc-secret=CHANGE_ME --file-allocation=none --listen-port=26999 --dht-listen-port=26998 </dev/null >>/vol2/1000/影视/aria2.log 2>&1 &",
+    "stall_kbps": 50,
+    "stall_minutes": 30,
+    "cron_minutes": 15,
+    "auto_verify": true,
+    "alert_cooldown_hours": 4,
+    "traffic_subscription": "",
+    "follow_urls": [],
+    "auto_add": false,
+    "proxy": ""
+  }
 }
