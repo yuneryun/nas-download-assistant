@@ -1,10 +1,10 @@
 ---
 name: media-downloader
-description: "Use when downloading movies/TV series (4K REMUX/BluRay via magnet on NAS) or music (lossless-first). Search→version selection→download→verify→notify + tv follow-up + watchdog, portable to any machine."
-version: 1.1.1
+description: "Use when downloading movies/TV series (4K REMUX/BluRay via magnet on NAS, or 夸克/网盘 share links for no-VIP users) or music (lossless-first). Search→version selection→download→verify→notify + tv follow-up + watchdog, portable to any machine."
+version: 1.2.0
 author: Hermes Agent + yuneryun
 license: MIT
-tags: [download, movie, tv-series, music, nas, aria2, bt, media, watchdog]
+tags: [download, movie, tv-series, music, nas, aria2, bt, quark, netdisk, media, watchdog]
 ---
 
 # 媒体下载器（电影 + 电视剧 + 音乐）统一 Skill
@@ -17,14 +17,23 @@ tags: [download, movie, tv-series, music, nas, aria2, bt, media, watchdog]
 
 ```
 用户需求(片名/剧名/歌名)
-  → ① 搜索: 多站点对比 (TPB/1337x/HAO4K/knaben + musicdl四源)
-  → ② 选版: 画质/体积/做种数/预估ETA 对比表 (规则见下)
-  → ③ 下载: NAS aria2c 后台 (RPC :16800) / musicdl 本机
+  → ① 搜索: 多站点对比 (TPB/1337x/HAO4K/knaben + PanSou网盘聚合 + musicdl四源)
+  → ② 选版: 画质/体积/做种数/预估ETA 对比表 (规则见下) + 通道分流(见「网盘通道」)
+  → ③ 下载: NAS aria2c 后台 (RPC :16800)
+       ├─ BT通道: 磁力 → aria2 (做种数/ETA规则选版)
+       └─ 网盘通道: PanSou搜链 → 夸克公开API验链 → 转存 → OpenList出直链 → aria2多线程拉
+                    (无会员可用; >40GB单文件回BT; 百度/115无会员不可自动化, 见references/pan-quark-channel.md)
+       音乐: musicdl 本机
   → ④ 校验: ffprobe 四道检查 / mutagen 元数据核对   ← 必过, 不过=未完成
   → ⑤ 归档: 规范命名 + 中文字幕 + 分类入库
   → ⑥ 通知: QQ/其他渠道推送结果
   ⟲ 看门狗: watchdog.py 周期巡检 ③-⑥ 全链路(RPC自愈/卡死救援/水位熔断/自动校验/剧集追更/告警去重)
 ```
+
+**两条影视通道的分工**（无网盘会员也可用，2026-09 实测定）：
+- **网盘通道（夸克/UC）**：搜分享链秒级验证、无做种依赖、新片/剧集最全、直连下载**不走机场流量**；代价 = 非会员单文件 ≤40GB + 每日转分配额
+- **BT 通道（磁力/种子）**：超大体积 4K REMUX 唯一路线、老片资源仍在 BT 站；代价 = 冷启动慢、做种数决定 ETA
+- 分流规则：4K REMUX/单文件 >40GB → BT；WEB-DL/剧集/新片 → 网盘优先（BT 同期做种少）。详见 `references/pan-quark-channel.md`
 
 ## 配置（scripts/config.json，部署时改这几项）
 
@@ -39,6 +48,16 @@ tags: [download, movie, tv-series, music, nas, aria2, bt, media, watchdog]
 | `media_server` | 归档后自动刷新媒体库(可选，见 library_refresh.py 头注) | emby/jellyfin/plex 任一 |
 
 watchdog 子配置（详见下文看门狗节）：`restart_cmd`(RPC掉线自愈命令) / `stall_kbps`+`stall_minutes`(卡死判定) / `auto_verify`(完成自动校验) / `follow_urls`+`auto_add`(剧集追更) / `traffic_subscription`(机场配额告警) / `alert_cooldown_hours`(告警去重窗口, 默认4)。
+
+网盘通道新增键（仅 `pan_pipeline.py` 使用）：
+
+| 键 | 说明 |
+|---|---|
+| `pan_pansou_api` | PanSou 聚合搜索端点，默认 `https://s.panhunt.com/api/search` |
+| `pan_quark_cookie` | 夸克网页端整条 Cookie（**仅转存 save 需要**，会过期） |
+| `pan_save_root` | 网盘侧转存落根目录，如 `/影视转存` |
+| `pan_openlist_url` | OpenList 地址，如 `http://127.0.0.1:5244` |
+| `pan_openlist_token` | OpenList 管理员 token（**仅取直链 fetch 需要**） |
 
 ## 电影流程
 
@@ -134,6 +153,18 @@ crontab 周期拉起的一轮巡检，六项职责（`python watchdog.py install
 
 **设计约束**：告警去重（同 key 默认 4h 只报一次，防刷屏）；状态存 `.watchdog_state.json`；一切动作可审计（`watchdog.log`）；**绝无删除文件代码路径**。`status` 子命令看现场，`test-notify` 测通知链路。
 
+## 网盘通道流程（pan_pipeline.py，夸克为主，无会员可用）
+
+与 BT 通道共用校验/归档/通知底层，只在①②③段不同。命令：`search/check/save/fetch/status`。
+
+1. **search**：PanSou 聚合（90+TG频道+60+资源站，一次搜出全部网盘类型），结果按 `merged_by_type.<disk>[]` 解析（**注意：无 `data.results` 键**），note 字段是标题、可能为空 → 不可直接采信
+2. **check**：夸克公开 API（token→detail，**无需登录**）验链 + 递归展开目录 → 得到真实文件列表/体积；失效链返回 `valid:false`；单文件 >40GB 标记"回 BT 通道"
+3. **save**：转存（需一次 Cookie；`--keep` 只挑命中子集省配额；异步 task 轮询 + **读回目标目录确认落盘**；message 含 limit/频 = 当日配额尽，停轮勿重试轰炸）
+4. **fetch**：OpenList `POST /api/fs/get` 拿 `raw_url` 直链 → 现有 aria2 RPC `addUri`（split=8 多线程）→ 入库；**不要用 OpenList WebUI 的"发送到 aria2"（夸克驱动有已知 issue #666），走 API 直链最稳**
+5. 之后 ffprobe 四道校验 / 三件套归档 / watchdog 巡检全部复用；下载侧与 BT 任务同栈统一被盯
+
+**环境层一次性部署**（OpenList 用户态二进制 + QuarkTV 驱动扫码授权 + 自启）：步骤与坑见 `references/pan-quark-channel.md`。
+
 ## 音乐流程
 
 沿用 musicdl（Python 包，Windows `.venv`/Linux pip 均可），完整坑与校验逻辑见 `references/musicdl-core.md`（从原 musicdl-music-download skill 迁移）。要点：
@@ -166,6 +197,7 @@ Hermes 账户家目录 `/home/Hermes` 不存在 → 一切写 HOME 的工具（r
 ## 参考文件
 - `scripts/nas-media-download.md` — NAS 下载栈完整部署记录（tracker 池、RPC 用法、飞牛坑）
 - `scripts/movie_pipeline.py` — 搜索→选版→下载→校验→归档 一体化脚本
+- `scripts/pan_pipeline.py` — 网盘通道：search(PanSou)/check(夸克验链)/save(转存)/fetch(OpenList直链→aria2)/status
 - `scripts/tv_pipeline.py` — 电视剧：pick/add(按集选文件)/progress/verify(时长离群检测)/scan(缺集盘点)/follow(追更)
 - `scripts/watchdog.py` — 看门狗：run(crontab)/status/install/test-notify 六项巡检
 - `scripts/verify_media.py` — 音乐完整性校验器（五道关卡，输出 verify_report.json）
@@ -174,5 +206,6 @@ Hermes 账户家目录 `/home/Hermes` 不存在 → 一切写 HOME 的工具（r
 - `references/musicdl-core.md` — 音乐下载完整坑库
 - `references/music-optimization.md` — 音乐进阶优化（Hi-Res验证/并发提速/元数据补全/查重）
 - `references/optimization-playbook.md` — 找不到资源/下载慢的优化手册（进阶）
+- `references/pan-quark-channel.md` — 网盘通道实测记录：各家可接管性/PanSou与夸克API字段/OpenList部署步骤/非会员限制处理
 - `references/faq-troubleshooting.md` — 他人部署常见问题排查手册（拉取失败/依赖/配置/安全）
 - `references/ai-handoff.md` — AI-to-AI 交接指南（发给别的 NAS 上的 agent 时让对方先读这份）

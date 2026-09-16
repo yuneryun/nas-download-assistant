@@ -1,6 +1,6 @@
 # NAS 下载助手 (nas-download-assistant)
 
-电影 + 电视剧 + 音乐 统一媒体下载 skill，配下载栈看门狗。为 Hermes Agent 等 AI agent 设计，脚本也可独立使用（Linux / Windows / 飞牛OS、群晖、威联通等任意 NAS，核心零第三方依赖，只用 Python 标准库 + aria2 + ffmpeg）。
+电影 + 电视剧 + 音乐 统一媒体下载 skill，**双下载通道（BT 磁力 / 网盘分享链）**，配下载栈看门狗。为 Hermes Agent 等 AI agent 设计，脚本也可独立使用（Linux / Windows / 飞牛OS、群晖、威联通等任意 NAS，核心零第三方依赖，只用 Python 标准库 + aria2 + ffmpeg）。
 
 > ⚖️ **本项目仅供个人学习、研究与技术交流，请支持正版。使用前必读文末[免责声明](#-免责声明)。**
 
@@ -11,6 +11,7 @@
 | 痛点 | 本项目的答案 |
 |---|---|
 | 同一部片几十个版本，选哪个？ | 选版引擎：画质/体积/做种数/ETA 对比表 + 作者实测规则（画质优先可牺牲速度，做种≥30直下，ETA>24h才降级） |
+| BT 挂半天没做种 / 新片找不到源？ | **网盘通道**：PanSou 聚合搜链（90+TG频道+60+资源站）→ 公开 API 秒验死链+列真实体积 → 转存 → OpenList 出直链 → 同一个 aria2 多线程入库。**无网盘会员可用** |
 | 磁力挂上去 0 速度干等？ | 看门狗卡死救援：补 tracker → 重连任务 → 仍救不活才告警让你换版，全程留痕 |
 | "下完了"其实看不了？ | **四道硬校验**才算完成：ffprobe 元数据 → 开中尾三段解码实测 → BT哈希 → 容器检查；下载完成 ≠ 任务完成 |
 | 电视剧一季 10 集怎么管？ | 整季包/分集自动选版、`--ep 1-12` 按集选文件省盘、逐集校验归档 `SxxEyy`、缺集盘点、**盯发布页自动追更** |
@@ -24,6 +25,12 @@
 ## 功能矩阵
 
 - 🎬 **电影**：多站点搜索（TPB/1337x/HAO4K/knaben）→ 版本对比表 → aria2 磁力下载 → 四道校验 → 规范归档 → 中文字幕指引
+- ☁️ **网盘通道**（`pan_pipeline.py`，2026-09 实测定：无会员条件下夸克/UC 是唯一可自动化的国内网盘）：
+  - `search`：PanSou 聚合一次搜出 夸克/UC/阿里/百度/115/迅雷/磁力 全类型分享链（免鉴权）
+  - `check`：夸克公开 API 验链 + **递归展开目录** → 真实文件列表与体积（免登录），自动标记 >40GB 单文件"回 BT 通道"
+  - `save`：转存到网盘根目录（`--keep` 只挑命中子集省每日配额；异步 task 轮询 + 读回目录确认落盘）
+  - `fetch`：OpenList `fs/get` 取 `raw_url` 直链 → **复用同一套 aria2 RPC** 多线程入库，与 BT 任务一起被看门狗盯
+  - 分流规则：4K REMUX/单文件>40GB → BT；WEB-DL/剧集/新片 → 网盘优先。百度/115 无会员不可自动化（115 开放平台 2026-08-09 已停服），详见 `references/pan-quark-channel.md`
 - 📺 **电视剧**（`tv_pipeline.py`）：
   - `pick`：整季包 vs 分集智能建议（剧集 1080p WEB-DL 即达标，神剧才上 4K；包 ETA>48h 降级分集）
   - `add --ep 1-12`：磁力包等元数据就绪后按集 select-file，只下要的集
@@ -52,6 +59,10 @@ python3 scripts/selftest.py
 python3 scripts/watchdog.py install    # 打印 crontab 行, 粘贴进 crontab -e
 
 # 4. 用法示例
+python3 scripts/pan_pipeline.py search "沙丘2" --disk quark,uc     # 网盘通道: 搜链
+python3 scripts/pan_pipeline.py check "https://pan.quark.cn/s/xxxx" # 验链+列真实文件树
+python3 scripts/pan_pipeline.py save  "https://pan.quark.cn/s/xxxx" --keep "2160p"
+python3 scripts/pan_pipeline.py fetch /quark/影视转存/xxx/yyy.mkv   # OpenList直链→aria2
 python3 scripts/movie_pipeline.py download "<magnet>" "盗梦空间 (2010) Inception"
 python3 scripts/tv_pipeline.py add "<magnet>" "曼达洛人 S01" --ep 1-8
 python3 scripts/tv_pipeline.py scan 曼达洛人 --season S01 --expect 8
@@ -74,6 +85,12 @@ python3 scripts/tv_pipeline.py follow 曼达洛人 "<发布页URL>" --auto
 
 经验：BT 速度呈马太效应，评估 ETA 要留余量；REMUX 无封装中文字幕（原盘特性），需外挂 SRT。
 
+### 网盘通道 API 实测 — 2026-09-16
+
+- PanSou 聚合（s.panhunt.com，免鉴权）：「沙丘2」命中 47 条（quark 22/magnet 7/115 6/ali 4/…），解析键是 `data.merged_by_type.<disk>[]`（**无 `data.results`**，老 README 会误导）
+- 夸克公开 API（token→detail，免登录）：链接有效性 + 递归展开目录 + 真实体积全部拿到（实测一条 28.9GB 合集含 2160p HDR x265 + 1080p WEB-DL + 中英字幕）
+- 环境侧 OpenList(QuarkTV 驱动)→aria2 拉取路径：脚本已就绪，NAS 部署完成后回归
+
 ### v1.1.0 电视剧+看门狗 (2026-09-16)
 
 10 项离线冒烟测试全过（真 ffmpeg 合成样片跑通 校验→归档→写库→隔离→盘点 全链路；测试中发现并修复 HTML 实体 `&amp;` 导致磁力文件名解析失败的 bug）。aria2 RPC 交互路径待 NAS 实机回归。
@@ -88,6 +105,7 @@ python3 scripts/tv_pipeline.py follow 曼达洛人 "<发布页URL>" --auto
 ```
 SKILL.md                      # 完整工作流文档 (AI agent 读这份)
 scripts/movie_pipeline.py     # 电影: search/pick/download/status/verify
+scripts/pan_pipeline.py       # 网盘通道: search/check/save/fetch/status
 scripts/tv_pipeline.py        # 电视剧: pick/add/progress/verify/scan/follow
 scripts/watchdog.py           # 看门狗: run(crontab)/status/install/test-notify
 scripts/verify_media.py       # 音乐五道校验器
@@ -98,6 +116,7 @@ scripts/nas-media-download.md # NAS(飞牛OS)部署实录+tracker池+搜索代�
 references/musicdl-core.md    # 音乐下载坑库
 references/music-optimization.md
 references/optimization-playbook.md  # 找不到资源/下载慢进阶手册
+references/pan-quark-channel.md      # 网盘通道实测记录: 各家可接管性/API字段/OpenList部署/非会员限制
 references/faq-troubleshooting.md    # 他人部署FAQ
 references/ai-handoff.md      # AI-to-AI 交接指南
 ```
