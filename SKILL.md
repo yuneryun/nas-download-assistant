@@ -1,7 +1,7 @@
 ---
 name: media-downloader
 description: "Use when downloading movies/TV series (4K REMUX/BluRay via magnet on NAS, or 夸克/网盘 share links for no-VIP users) or music (lossless-first). Search→version selection→download→verify→notify + tv follow-up + watchdog, portable to any machine."
-version: 1.2.0
+version: 1.2.1
 author: Hermes Agent + yuneryun
 license: MIT
 tags: [download, movie, tv-series, music, nas, aria2, bt, quark, netdisk, media, watchdog]

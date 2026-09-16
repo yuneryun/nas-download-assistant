@@ -74,3 +74,16 @@ GET  https://drive.quark.cn/1/clouddrive/share/sharepage/detail?pr=ucpro&fr=pc
 ## 脚本
 
 `scripts/pan_pipeline.py`：`search / check / save / fetch / status` 五个子命令，与 movie/tv pipeline 共用 config.json。新增配置键：`pan_pansou_api`、`pan_quark_cookie`（仅 save 需要）、`pan_save_root`、`pan_openlist_url`、`pan_openlist_token`（仅 fetch 需要）。
+
+## 本环境（飞牛OS 192.168.1.3）实机部署记录 — 2026-09-17
+
+- 位置：`/vol1/1000/openlist/`（openlist v4.2.6 单二进制+sqlite），**HOME 必须 export 为该目录**（飞牛家目录坑）
+- 自启：`/vol1/1000/openlist/start-stack.sh`（crontab @reboot）= openlist(:5244) + **自建 aria2 RPC(:16801, --rpc-listen-all, dir=影视/下载暂存)**
+  - ⚠️ :16800 属另一 agent（ClawBot/openclaw 应用，save-session 模式），**端口分开、互不接管互不杀**
+- 驱动 API：`POST /api/admin/storage/create`（**是 create 不是 add**）；`delete?id=N` 在 v4.2.6 静默失效 → 用 `disable?id=N`
+- QuarkTV 扫码可全程走 API：create 响应 500 message 里带 `data:image/jpeg;base64,` 二维码 → 存图给用户扫 → `disable`+`enable` 重跑 Init → `refresh_token/device_id` 自动填充、status=work
+- **实测速度（无会员，48MB 样本）**：单连接 ~25KB/s；4 路 range 并行 ~90KB/s；aria2 split=8 观测 0.1~0.4MB/s 且随时间衰减，最终字节数与源一致
+  - 结论：夸克 TV 直链是**按连接+按账号**限速，非会员天花板就是 0.1-0.4MB/s → 20GB 级 ≈ 1-2 天，"挂着慢慢下"成立；>40GB REMUX 仍走 BT；开夸克 VIP(50MB/s) 才有质变
+- 已验链路（NAS 本机执行，无需任何代理）：`search`(PanSou 直连 OK) → `check`(夸克公开 API) → `fs/get`(raw_url=dl-c-*.pds.quark.cn) → `aria2` 完成
+- **未闭环一步**：save 自动转存需要夸克网页端 Cookie 填 `pan_quark_cookie`（用户抓一次）；没有它只能拉"已在自己网盘里"的文件
+- 凭据落盘位置（均 NAS 本地，不过网络）：openlist admin 密码=首次启动打印；token=`/vol1/1000/media-downloader/.ol_token`；aria2 secret+全配置=`/vol1/1000/media-downloader/scripts/config.json`

@@ -89,7 +89,7 @@ python3 scripts/tv_pipeline.py follow 曼达洛人 "<发布页URL>" --auto
 
 - PanSou 聚合（s.panhunt.com，免鉴权）：「沙丘2」命中 47 条（quark 22/magnet 7/115 6/ali 4/…），解析键是 `data.merged_by_type.<disk>[]`（**无 `data.results`**，老 README 会误导）
 - 夸克公开 API（token→detail，免登录）：链接有效性 + 递归展开目录 + 真实体积全部拿到（实测一条 28.9GB 合集含 2160p HDR x265 + 1080p WEB-DL + 中英字幕）
-- 环境侧 OpenList(QuarkTV 驱动)→aria2 拉取路径：脚本已就绪，NAS 部署完成后回归
+- 环境侧 OpenList(QuarkTV 驱动)→aria2 拉取路径：✅ 09-17 NAS 实机端到端通过（fs/get 直链→aria2 字节一致）；**无会员实测 0.1~0.4MB/s（按连接+账号限速，20GB≈1-2天）**，部署全记录见 references/pan-quark-channel.md 末节
 
 ### v1.1.0 电视剧+看门狗 (2026-09-16)
 
