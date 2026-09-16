@@ -6,6 +6,7 @@
   python movie_pipeline.py status               # 当前下载状态
   python movie_pipeline.py verify <文件路径> "<片名> (年份)"  # 单独校验+归档
 依赖: aria2c(RPC), ffprobe/ffmpeg; 配置见 config.json
+⚖️ 仅供学习与个人合法用途, 请先确认你对目标内容的下载权利(见仓库 README 免责声明)。
 """
 import json,os,re,subprocess,sys,urllib.request,shutil,time
 
@@ -17,7 +18,8 @@ CONF=json.load(open(CONF_PATH,encoding='utf-8')) if os.path.exists(CONF_PATH) el
     'library_index':os.path.expanduser('~/media_library.json'),
     'notify_cmd':''}
 RPC=CONF['aria2_rpc']; SEC=CONF['aria2_secret']
-LIB=CONF.get('library_index')
+LIB=CONF.get('library_index') or ''
+if LIB and not os.path.isabs(LIB): LIB=os.path.join(HERE, LIB)
 
 def rpc(method, params=None):
     body={"jsonrpc":"2.0","id":"1","method":method,"params":["token:"+SEC]+(params or [])}
@@ -95,17 +97,25 @@ def verify_and_archive(raw_path,archive_name):
         if (w,h)!=(3840,2160) and '2160' not in raw_path: issues.append(f'非4K({w}x{h})')
         if br and br<20e6 and h==2160: issues.append('4K但码率<20Mbps(假4K嫌疑)')
     except Exception as e: issues.append(f'元数据读取失败:{e}')
-    # 2 解码实测
-    d=int(float(meta.get('format',{}).get('duration',0)))
-    for pos in (60, d//2, max(0,d-90)):
-        r=subprocess.run(['ffmpeg','-v','error','-ss',str(pos),'-i',raw_path,'-t','30','-f','null','-'],
-                         capture_output=True,text=True)
-        if r.stderr.strip(): issues.append(f'解码错误@{pos}s: {r.stderr[:80]}')
+    # 2 解码实测 (元数据都没读出来就别空跑三段ffmpeg)
+    d=int(float((meta.get('format') or {}).get('duration',0) or 0))
+    if d:
+        for pos in (60, d//2, max(0,d-90)):
+            r=subprocess.run(['ffmpeg','-v','error','-ss',str(pos),'-i',raw_path,'-t','30','-f','null','-'],
+                             capture_output=True,text=True)
+            if r.stderr.strip(): issues.append(f'解码错误@{pos}s: {r.stderr[:80]}')
     # 3/4 哈希+容器已由 aria2 完成校验 + ffprobe 无 Invalid data
     r=subprocess.run(['ffprobe','-v','error',raw_path],capture_output=True,text=True)
     if 'Invalid data' in r.stderr: issues.append('容器损坏')
     if issues:
-        print('❌ 校验未通过:',issues); return False
+        # 残件移隔离区, 绝不删除(用户铁律: 任何文件不代删)
+        quar=os.path.join(CONF['download_dir_movies'],'_quarantine')
+        os.makedirs(quar,exist_ok=True)
+        dst_q=os.path.join(quar, os.path.basename(raw_path)+'.'+time.strftime('%m%d%H%M')+'.bad')
+        shutil.move(raw_path,dst_q)
+        print('❌ 校验未通过 → 残件已移入隔离区(未删除):',dst_q)
+        for i in issues: print('   └',i)
+        return False
     # 归档
     dst=os.path.join(CONF['download_dir_movies'],archive_name)
     dst_full=dst+'.mkv' if not raw_path.endswith('.mkv') else dst
@@ -122,6 +132,10 @@ def verify_and_archive(raw_path,archive_name):
     if CONF.get('notify_cmd'):
         subprocess.run(CONF['notify_cmd'].replace('{msg}',
             f'🎬 {archive_name} 校验完成, 可观看 ({dst_full})'),shell=True)
+    # 媒体库增量刷新(Emby/Jellyfin/Plex, 未配置静默跳过)
+    try:
+        import library_refresh; library_refresh.refresh(dst_full, verbose=False)
+    except Exception: pass
     print(f'✅ 校验通过并归档: {dst_full}')
     # 字幕提醒
     print('ℹ️ 字幕: 请到 OpenSubtitles/SubHD 搜索中文字幕, 与视频同名放同目录')

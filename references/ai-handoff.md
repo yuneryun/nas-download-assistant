@@ -21,6 +21,7 @@ python3 scripts/selftest.py
 - `aria2_rpc` / `aria2_secret` → 本机 aria2 的 RPC（自己起的就用自己设的 secret）
 - `min_free_gb` → 按用户磁盘调
 - `notify_cmd` → 问用户要不要通知，要的话写推送命令
+- `media_server` → 问用户 NAS 上有没有 Emby/Jellyfin/Plex：有就按 library_refresh.py 头注填，归档后自动刷库；没有就留 `{}`
 - `watchdog.restart_cmd` → 填成你环境的 aria2 拉起命令（setsid 后台，见 nas-media-download.md），这是看门狗自愈的前提
 - `watchdog.follow_urls` / `auto_add` → 用户要追更的剧+发布页；不确定就先留空
 

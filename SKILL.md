@@ -1,7 +1,7 @@
 ---
 name: media-downloader
 description: "Use when downloading movies/TV series (4K REMUX/BluRay via magnet on NAS) or music (lossless-first). Search→version selection→download→verify→notify + tv follow-up + watchdog, portable to any machine."
-version: 1.1.0
+version: 1.1.1
 author: Hermes Agent + yuneryun
 license: MIT
 tags: [download, movie, tv-series, music, nas, aria2, bt, media, watchdog]
@@ -10,6 +10,8 @@ tags: [download, movie, tv-series, music, nas, aria2, bt, media, watchdog]
 # 媒体下载器（电影 + 电视剧 + 音乐）统一 Skill
 
 可复用、可交接的媒体下载工作流。给别人用时：只需一台 Linux/Windows 机器（NAS 最佳）+ 本 skill 脚本，改配置文件的几个参数即可。
+
+> ⚖️ **合规红线（每次执行前自检）**：本工作流仅用于下载**用户有权获取的内容**（公有领域、自有版权、官方授权、合法试看后购买等），仅限个人学习研究交流；下载完成后 24 小时内删除或自行购买正版。不得分发、上传、公开传播、商用。对版权状况不明或明显盗版首发源（如院线热映电影），先向用户提示风险由其确认，不默默执行。所有脚本无删除/分发能力，只做本地入库。
 
 ## 架构总览
 
@@ -34,6 +36,7 @@ tags: [download, movie, tv-series, music, nas, aria2, bt, media, watchdog]
 | `aria2_rpc` | aria2 RPC 地址+secret | `http://127.0.0.1:16800` / `fnosdl` |
 | `min_free_gb` | 磁盘水位线，低于则拒下并提醒 | `500` |
 | `notify_cmd` | 完成通知命令(可选)，`{msg}` 为占位符 | QQ/webhook/echo |
+| `media_server` | 归档后自动刷新媒体库(可选，见 library_refresh.py 头注) | emby/jellyfin/plex 任一 |
 
 watchdog 子配置（详见下文看门狗节）：`restart_cmd`(RPC掉线自愈命令) / `stall_kbps`+`stall_minutes`(卡死判定) / `auto_verify`(完成自动校验) / `follow_urls`+`auto_add`(剧集追更) / `traffic_subscription`(机场配额告警) / `alert_cooldown_hours`(告警去重窗口, 默认4)。
 
@@ -78,8 +81,10 @@ ffmpeg -v error -ss <pos> -i <file> -t 30 -f null - 2>&1
 # 3. BT哈希: aria2 下载完成即自动校验 (check-integrity)
 # 4. 容器: ffprobe 无 "Invalid data" 报错
 ```
-任何一项失败 → 重试校验 → 仍失败则删除残件并报告，**绝不留看不了的文件在库里**。
+任何一项失败 → 重试校验 → 仍失败则残件移入 `_quarantine/` 隔离区等用户处置（**铁律：绝不代删任何文件**），绝不留看不了的文件在正式库里。
 REMUX 预期：3840×2160 / 视频码率 40-80Mbps / HEVC / HDR10 或 DV 元数据。
+
+校验通过后若配了 `media_server`，`library_refresh.py` 自动通知 Emby/Jellyfin/Plex 增量刷库（定向优先、全库兜底、未配置静默跳过）。
 
 ### ⑤ 归档（三件套）
 1. **改名**：`盗梦空间 (2010) Inception.mkv`（中文+年份+英文，刮削器友好；电视剧 `剧名 S01E01.mkv`）
@@ -164,6 +169,7 @@ Hermes 账户家目录 `/home/Hermes` 不存在 → 一切写 HOME 的工具（r
 - `scripts/tv_pipeline.py` — 电视剧：pick/add(按集选文件)/progress/verify(时长离群检测)/scan(缺集盘点)/follow(追更)
 - `scripts/watchdog.py` — 看门狗：run(crontab)/status/install/test-notify 六项巡检
 - `scripts/verify_media.py` — 音乐完整性校验器（五道关卡，输出 verify_report.json）
+- `scripts/library_refresh.py` — Emby/Jellyfin/Plex 归档后增量刷新钩子（未配置静默跳过）
 - `scripts/selftest.py` — 部署自检
 - `references/musicdl-core.md` — 音乐下载完整坑库
 - `references/music-optimization.md` — 音乐进阶优化（Hi-Res验证/并发提速/元数据补全/查重）

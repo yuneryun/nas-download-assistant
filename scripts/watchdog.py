@@ -10,8 +10,10 @@
   5. 剧集追更: config.watchdog.follow_urls 里的页面 → 调 tv_pipeline.follow 提新集,
      auto_add=true 时自动入队
   6. 失败任务: error 状态 → 报告+入待处理; 绝不自动删文件(用户铁律: 只移隔离区)
+附带: 自动校验队列消费完成后联动 library_refresh 通知媒体库服务器。
 
 告警去重: 同一问题 4 小时内只报一次(state.json)。通知走 config.notify_cmd。
+⚖️ 仅供学习与个人合法用途(见仓库 README 免责声明); 代码无任何删除文件路径。
 
 用法:
   python watchdog.py run          # 跑一轮(crontab 用这个)
@@ -46,8 +48,8 @@ TRACKER_POOL = ('udp://tracker.opentrackr.org:1337/announce,'
                 'http://p4p.arenabg.com:1337/announce,'
                 'http://tracker.bt4g.com:2095/announce')
 
-KEYS = ['gid', 'status', 'statusReason', 'totalLength', 'completedLength', 'downloadSpeed',
-        'connections', 'verifiableLength', 'name', 'dir', 'error_code' ]
+KEYS = ['gid', 'status', 'totalLength', 'completedLength', 'downloadSpeed',
+        'connections', 'name', 'dir', 'errorMessage']
 
 
 def now():
@@ -185,6 +187,7 @@ def check_stalls(s, tasks):
             magnet = uri[0].get('uri') if isinstance(uri, list) and uri else None
             s['seen'].pop(g, None)  # 旧gid出账, 不误报任务消失
             if magnet:
+                rpc('aria2.remove', [g])  # 必须先移除, 否则同磁力 addUri 会被 aria2 拒绝(RESOURCE_IN_USE)
                 ok = rpc('aria2.addUri', [[magnet], {'dir': f['dir'], 'seed-time': '0',
                                                      'check-integrity': 'true'}])
                 if isinstance(ok, str):

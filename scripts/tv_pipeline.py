@@ -133,13 +133,14 @@ def wait_metadata(gid, timeout=150):
 
 
 def add(magnet, label, ep_range=None):
+    """成功 True / 失败 False — 绝不 sys.exit(会被 watchdog 当库 import 调用, 退出会杀死看门狗)"""
     season_dir = os.path.join(TVDIR, label)
     os.makedirs(season_dir, exist_ok=True)
     if shutil.disk_usage(TVDIR).free / 1e9 < CONF['min_free_gb']:
-        print(f'❌ 磁盘余量不足 {CONF["min_free_gb"]}GB, 拒绝下载'); sys.exit(1)
+        print(f'❌ 磁盘余量不足 {CONF["min_free_gb"]}GB, 拒绝下载'); return False
     gid = rpc('aria2.addUri', [[magnet], {'dir': season_dir, 'seed-time': '0'}])
     if not gid:
-        sys.exit(1)
+        return False
     print(f'✅ 已加入 {label}  GID={gid}')
     man = load_manifest()
     entry = man.setdefault(label, {'episodes': {}, 'magnets': []})
@@ -167,6 +168,7 @@ def add(magnet, label, ep_range=None):
         else:
             print('⚠️ 元数据等待超时(可能0 DHT连接), 保留整包; 稍后 progress 查看或重下')
     save_manifest(man)
+    return True
 
 
 def progress(label):
@@ -226,7 +228,9 @@ def verify(path, label=None):
     if not m:
         print('❌ label/文件名里解析不到 SxxEyy 集号'); return False
     s_e = f'S{int(m.group(1)):02d}E{int(m.group(2)):02d}'
-    show = label.split(' ')[0]
+    # 剧名 = 第一个 SxxEyy 之前的部分, 再去掉尾部孤立的季标记("剧名 S01 release名.S01E01..." → "剧名")
+    show = re.sub(r'[\s._\-]+[Ss]\d{1,2}[\s._\-]*\S*$', '', label[:m.start()]).strip(' .-_') \
+         or label.split(' ')[0]
     season = f'S{int(m.group(1)):02d}'
     # 1 元数据
     r = subprocess.run(['ffprobe', '-v', 'error', '-select_streams', 'v:0', '-show_entries',
@@ -287,6 +291,7 @@ def verify(path, label=None):
                 'duration_min': round(dur, 1), 'verified': True, 'date': time.strftime('%Y-%m-%d')})
     json.dump(lib, open(LIB, 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
     notify(f'📺 {show} {s_e} 校验完成 已归档 ({dst})')
+    refresh_library(dst)
     print('✅ 校验通过并归档:', dst)
     print('ℹ️ 字幕: 逐集外挂SRT与视频同名放同目录(OpenSubtitles/SubHD); 整季可一次搜齐')
     return True
@@ -295,6 +300,15 @@ def verify(path, label=None):
 def notify(msg):
     if CONF.get('notify_cmd'):
         subprocess.run(CONF['notify_cmd'].replace('{msg}', msg), shell=True)
+
+
+def refresh_library(path=None):
+    """归档成功后通知 Emby/Jellyfin/Plex(未配置则静默跳过); 永不抛异常"""
+    try:
+        import library_refresh
+        library_refresh.refresh(path, verbose=False)
+    except Exception:
+        pass
 
 
 # ────────────────────────── 缺集盘点 ──────────────────────────
