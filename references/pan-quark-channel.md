@@ -87,3 +87,14 @@ GET  https://drive.quark.cn/1/clouddrive/share/sharepage/detail?pr=ucpro&fr=pc
 - 已验链路（NAS 本机执行，无需任何代理）：`search`(PanSou 直连 OK) → `check`(夸克公开 API) → `fs/get`(raw_url=dl-c-*.pds.quark.cn) → `aria2` 完成
 - **未闭环一步**：save 自动转存需要夸克网页端 Cookie 填 `pan_quark_cookie`（用户抓一次）；没有它只能拉"已在自己网盘里"的文件
 - 凭据落盘位置（均 NAS 本地，不过网络）：openlist admin 密码=首次启动打印；token=`/vol1/1000/media-downloader/.ol_token`；aria2 secret+全配置=`/vol1/1000/media-downloader/scripts/config.json`
+## 多线程钉死（v1.2.2 全路径审计）
+
+夸克按连接限速(单连接~60KB/s)，**连接数=第一生产力**，全部下载路径已钉 16 连接（aria2 上限）：
+
+1. **守护进程级**：`/vol2/1000/影视/下载暂存/aria2.conf`（`split=16 max-connection-per-server=16 min-split-size=8M max-concurrent-downloads=5`），start-stack.sh 用 `--conf-path` 加载 → 任何来源(含手工/看门狗/老脚本)的任务默认 16 连接
+2. `pan_pipeline.py fetch`：任务级也显式带 16 连接参数
+3. `watchdog.py` 卡死重连：remove+add 时带上 16 连接参数（旧版会退回全局默认——现在全局也对了，双保险）
+4. `movie_pipeline.py start_download`：**修复真 bug**——旧版绕过 RPC 直接 setsid 起新 aria2c(端口 16800，与别的 agent 守护冲突)；改为 RPC addUri 进现有守护(:16801)
+5. `tv_pipeline.py` 两处 addUri（整包+按集 select-file）同样钉上
+
+实测(48MB 样本, 非会员)：申请 16 → 夸克实际只给 **4 条连接**（服务端封顶），合计 0.25MB/s；尾段分片先后完成→conn 4→3→2→1 递减属正常，总耗时 ~3min。**结论：客户端已是上限，再提速只剩夸克 VIP(50MB/s 不限连接) 或换 BT。**

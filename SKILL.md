@@ -1,7 +1,7 @@
 ---
 name: media-downloader
 description: "Use when downloading movies/TV series (4K REMUX/BluRay via magnet on NAS, or 夸克/网盘 share links for no-VIP users) or music (lossless-first). Search→version selection→download→verify→notify + tv follow-up + watchdog, portable to any machine."
-version: 1.2.1
+version: 1.2.2
 author: Hermes Agent + yuneryun
 license: MIT
 tags: [download, movie, tv-series, music, nas, aria2, bt, quark, netdisk, media, watchdog]
@@ -160,7 +160,7 @@ crontab 周期拉起的一轮巡检，六项职责（`python watchdog.py install
 1. **search**：PanSou 聚合（90+TG频道+60+资源站，一次搜出全部网盘类型），结果按 `merged_by_type.<disk>[]` 解析（**注意：无 `data.results` 键**），note 字段是标题、可能为空 → 不可直接采信
 2. **check**：夸克公开 API（token→detail，**无需登录**）验链 + 递归展开目录 → 得到真实文件列表/体积；失效链返回 `valid:false`；单文件 >40GB 标记"回 BT 通道"
 3. **save**：转存（需一次 Cookie；`--keep` 只挑命中子集省配额；异步 task 轮询 + **读回目标目录确认落盘**；message 含 limit/频 = 当日配额尽，停轮勿重试轰炸）
-4. **fetch**：OpenList `POST /api/fs/get` 拿 `raw_url` 直链 → 现有 aria2 RPC `addUri`（split=8 多线程）→ 入库；**不要用 OpenList WebUI 的"发送到 aria2"（夸克驱动有已知 issue #666），走 API 直链最稳**
+4. **fetch**：OpenList `POST /api/fs/get` 拿 `raw_url` 直链 → 现有 aria2 RPC `addUri`（**16 连接全局钉死**：守护进程 aria2.conf + 任务级参数双保险；夸克非会员实际发 4 连接封顶）→ 入库；**不要用 OpenList WebUI 的"发送到 aria2"（夸克驱动有已知 issue #666），走 API 直链最稳**
 5. 之后 ffprobe 四道校验 / 三件套归档 / watchdog 巡检全部复用；下载侧与 BT 任务同栈统一被盯
 
 **环境层一次性部署**（OpenList 用户态二进制 + QuarkTV 驱动扫码授权 + 自启）：步骤与坑见 `references/pan-quark-channel.md`。
