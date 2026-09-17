@@ -69,17 +69,19 @@ def start_download(magnet,dst):
     if disk_free_gb(dst) < CONF['min_free_gb']:
         print(f'❌ 磁盘余量不足{CONF["min_free_gb"]}GB, 拒绝下载'); sys.exit(1)
     os.makedirs(dst,exist_ok=True)
-    log=os.path.join(dst,'aria2.log')
-    cmd=(f'setsid aria2c --seed-time=0 --enable-rpc --rpc-listen-port=16800 '
-         f'--rpc-secret={SEC} --dir={dst} --file-allocation=none '
-         f'--listen-port=26999 --dht-listen-port=26998 "{magnet}" </dev/null >>{log} 2>&1 &')
-    subprocess.run(cmd,shell=True)
-    time.sleep(3)
-    active=rpc('aria2.tellActive')
-    if active:
-        print('✅ 下载已启动 GID:',active[0]['gid'])
+    rpc_url = CONF['aria2_rpc'].rstrip('/')+'/jsonrpc'
+    body={"jsonrpc":"2.0","id":"1","method":"aria2.addUri",
+          "params":["token:"+SEC,[magnet],{"dir":dst,"seed-time":"0",
+                    "split":"16","max-connection-per-server":"16","min-split-size":"8M"}]}
+    req=urllib.request.Request(rpc_url,data=json.dumps(body).encode(),
+                               headers={'Content-Type':'application/json'})
+    gid=None
+    try: gid=json.loads(urllib.request.urlopen(req,timeout=15).read()).get('result')
+    except Exception as e: print(f'⚠️ RPC addUri 失败: {e} (确认 aria2 守护在跑: start-stack.sh)')
+    if gid:
+        print('✅ 下载已启动 GID:',gid)
     else:
-        print('⚠️ 未立即见到活动任务, 查日志:',log)
+        print('⚠️ 未立即见到活动任务, 查日志:',os.path.join(dst,'aria2.log'))
 
 def verify_and_archive(raw_path,archive_name):
     """四道校验 + 改名归档 + 字幕提示 + 写库"""

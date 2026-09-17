@@ -138,7 +138,9 @@ def add(magnet, label, ep_range=None):
     os.makedirs(season_dir, exist_ok=True)
     if shutil.disk_usage(TVDIR).free / 1e9 < CONF['min_free_gb']:
         print(f'❌ 磁盘余量不足 {CONF["min_free_gb"]}GB, 拒绝下载'); return False
-    gid = rpc('aria2.addUri', [[magnet], {'dir': season_dir, 'seed-time': '0'}])
+    gid = rpc('aria2.addUri', [[magnet], {'dir': season_dir, 'seed-time': '0',
+                                          'split': '16', 'max-connection-per-server': '16',
+                                          'min-split-size': '8M'}])
     if not gid:
         return False
     print(f'✅ 已加入 {label}  GID={gid}')
@@ -159,6 +161,8 @@ def add(magnet, label, ep_range=None):
             if picks:
                 rpc('aria2.remove', [gid], quiet=True)
                 gid2 = rpc('aria2.addUri', [[magnet], {'dir': season_dir, 'seed-time': '0',
+                                                       'split': '16', 'max-connection-per-server': '16',
+                                                       'min-split-size': '8M',
                                                        'select-file': ','.join(str(i) for i, _, _ in picks)}])
                 for i, ep, fn in picks:
                     entry['episodes'][f'E{ep:02d}'] = {'gid': gid2, 'idx': i, 'file': fn, 'status': 'downloading'}

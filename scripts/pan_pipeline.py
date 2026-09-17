@@ -244,11 +244,12 @@ def cmd_fetch(pan_path, rename=None):
     rpc = C.get("aria2_rpc", "http://127.0.0.1:16800").rstrip("/") + "/jsonrpc"
     secret = C.get("aria2_secret", "")
     out = rename or os.path.basename(pan_path)
+    # 多线程钉死 16（夸克按连接限速, 连接越多合计越快; aria2 上限即 16）
     r = http(rpc, {"jsonrpc": "2.0", "id": "1", "method": "aria2.addUri",
                    "params": ["token:" + secret if secret else secret, [raw],
                               {"out": out, "dir": C.get("download_dir_movies", "."),
-                               "split": "8", "max-connection-per-server": "8",
-                               "min-split-size": "16M", "summary": f"[pan] {out}"}]})
+                               "split": "16", "max-connection-per-server": "16",
+                               "min-split-size": "8M", "summary": f"[pan] {out}"}]})
     gid = r.get("result", "")
     print(f"✅ aria2 已入队 {out} ({size/1e9:.1f}GB) gid={gid}")
     return gid

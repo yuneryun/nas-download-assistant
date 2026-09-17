@@ -189,7 +189,10 @@ def check_stalls(s, tasks):
             if magnet:
                 rpc('aria2.remove', [g])  # 必须先移除, 否则同磁力 addUri 会被 aria2 拒绝(RESOURCE_IN_USE)
                 ok = rpc('aria2.addUri', [[magnet], {'dir': f['dir'], 'seed-time': '0',
-                                                     'check-integrity': 'true'}])
+                                                     'check-integrity': 'true',
+                                                     'split': '16',
+                                                     'max-connection-per-server': '16',
+                                                     'min-split-size': '8M'}])
                 if isinstance(ok, str):
                     s['seen'][ok] = {**f, 'alerts': {}, 'rescued_ts': time.time()}
                     log(f'   重连成功, 新GID={ok}')
